@@ -1,0 +1,210 @@
+#cloud-config
+autoinstall:
+  version: 1
+  early-commands:
+    - sudo systemctl stop ssh
+  locale: en_US
+  keyboard:
+    layout: en
+  #  variant: us
+    # general packages needed for machines - referenced from https://tekanaid.com/posts/hashicorp-packer-build-ubuntu20-04-vmware
+  packages:
+    - openssh-server
+    - open-vm-tools
+    - cloud-init
+  #packages: [open-vm-tools, openssh-server, perl, open-iscsi, curl, vim, software-properties-common, apt-transport-https, ca-certificates, lsb-release]
+    # network setup - referenced from https://tekanaid.com/posts/hashicorp-packer-build-ubuntu20-04-vmware
+  network:
+    version: 2
+    ethernets:
+      ens192:
+        dhcp4: true
+          # dhcp-identifier: mac
+  identity:
+    hostname: packer-ubuntu-template
+    username: packeradmin
+        # Password Generated with: mkpasswd --method=SHA-512 --rounds=4096
+    password: '$6$rounds=4096$euYLDuUAJTXJnR$BUwYrgd5c5LXqsydftFrb8R.vyvnQwcBc5IpY7JaZ8LakYs04s5u/xspnesjgynomDn/UT22Flt1Y0rCDlfr10'
+  ssh:
+    #authorized-keys:
+      # - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDCZ5xqBiFpBy45uLEDAGpBlUAYM+Hm7f33Wi8ghB0t2ew523pkY3L1iv3LwLDGYuVygBFdo4qRecgjuPUVXt7jgLKiltP6wr3cgtXn7CO3t7wP2HnKYIryYU/yLEWLBpoSwR4BERi1mCi+9gsM9/lGpyRxC3An2c8uqAh/L48GAlOgTkpeQguLUq7O7PbyR6/0JShdd0Un/DymF4DJp/L2JPcsNi8RfG8qV+RnHJoIcZH2y9lJw/s7zK2f0gk/OG8/F36knCG5hKlab+a8ZI0Whwd5mRCmTEZzWleuPS3vLGA3IZNAYFrsx8Z845GQWD92gnvMw7hFdJojQVg39fg8DtiqEY0BCII6jFXAbLAqVWt8pqNXZ7GOE4VntNoBtbkDqXUag/5JmnmOnnJYavSIy5YISZS/rD0SnJ6/aBuow1Kupvy/5keQCWe7Rc1nGdbFV4qzDpG3M1ePXjAS52q+yiZU5x2Vit7lGZFLO65OMug6F7XqK0NULFGOBjfNrtE=
+    #  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPTiIzoDI8wNQEBcTKOifRZLa/6le23KoSJN4WIGjujA
+    install-server: true
+    allow-pw: true
+  storage:
+    config:
+    # Create gpt paritition table for sda the root OS volume
+    - {
+      ptable: gpt, 
+      path: /dev/sda, 
+      wipe: superblock, 
+      preserve: false, 
+      name: '', 
+      grub_device: false,
+      type: disk, 
+      id: disk-sda
+      }
+    # Create EFI volume device for grub
+    - {
+      device: disk-sda, 
+      size: 536870912, 
+      wipe: superblock, 
+      flag: boot, 
+      number: 1, 
+      preserve: false, 
+      grub_device: true, 
+      type: partition, 
+      id: partition-0
+      }
+    # Make Fat32 Partition used for EFI partition.
+    - {
+      fstype: fat32, 
+      volume: partition-0, 
+      preserve: false, 
+      type: format, 
+      id: format-0
+      }
+    # Create boot volume partition.
+    - {
+      device: disk-sda, 
+      size: 1073741824, 
+      wipe: superblock, 
+      flag: '', 
+      number: 2,
+      preserve: false, 
+      type: partition, 
+      id: partition-1
+      }
+    # Format the volume as ext4 for the /boot volume.  
+    - {
+      fstype: ext4, 
+      volume: partition-1, 
+      preserve: false, 
+      type: format, 
+      id: format-1}
+    # Create new partition for LVM volume group.
+    - {
+      device: disk-sda, 
+      size: -1, 
+      wipe: superblock, 
+      flag: '', 
+      number: 3,
+      preserve: false, 
+      type: partition, 
+      id: partition-2
+      }
+    #Create default root Volume Group.
+    - { 
+      name: ubuntu-vg,
+      devices: [partition-2],
+      preserve: false,
+      type: lvm_volgroup,
+      id: lvm_volgroup-0,
+      }
+    - {
+      name: ubuntu-lv-root, 
+      volgroup: lvm_volgroup-0, 
+      size: -1, 
+      wipe: superblock,
+      preserve: false, 
+      type: lvm_partition, 
+      id: lvm_partition-0
+      }
+    - {
+      fstype: ext4, 
+      volume: lvm_partition-0, 
+      preserve: false, 
+      type: format, 
+      id: format-2
+      }
+    # Mount /
+    - {
+      path: /, 
+      device: format-2, 
+      type: mount, 
+      id: mount-2
+      }
+    # Mount /boot
+    - {
+      path: /boot, 
+      device: format-1, 
+      type: mount, 
+      id: mount-1
+      }
+    # Mount / efi
+    - {
+      path: /boot/efi, 
+      device: format-0, 
+      type: mount, 
+      id: mount-0
+      }
+    #Setup Partition table for sdb (Data Volume)
+    - {
+      ptable: gpt, 
+      path: /dev/sdb, 
+      wipe: superblock, 
+      preserve: false, 
+      name: 'data', 
+      grub_device: false,
+      type: disk, 
+      id: disk-sdb
+      }
+    # Create partition for data volume group
+    - {
+      device: disk-sdb, 
+      size: -1, 
+      wipe: superblock, 
+      flag: '', 
+      number: 1,
+      preserve: false, 
+      type: partition, 
+      id: partition-3
+      }
+    # Create volume group for /data
+    - {
+      name: ubuntu-vg-data,
+      devices: [partition-3],
+      preserve: false,
+      type: lvm_volgroup,
+      id: lvm_volgroup-1
+      }
+    # create logical volume for /data
+    - {
+      name: ubuntu-lv-data, 
+      volgroup: lvm_volgroup-1, 
+      size: -1, 
+      wipe: superblock,
+      preserve: false, 
+      type: lvm_partition, 
+      id: lvm_partition-1
+      }
+    # Format the lvm partition as xfs
+    - {
+      fstype: xfs, 
+      volume: lvm_partition-1, 
+      preserve: false, 
+      type: format, 
+      id: format-3
+      }
+    # mount volume.
+    - {
+      path: /data, 
+      device: format-3, 
+      type: mount, 
+      id: mount-3
+      }
+  apt:
+    primary:
+      - arches: [amd64, i386]
+        uri: http://archive.ubuntu.com/ubuntu
+  user-data:
+    disable_root: false
+  late-commands:
+    - echo 'packeradmin ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/packeradmin
+ #   - 'sed -i "s/dhcp4: true/&\n      dhcp-identifier: mac/" /target/etc/netplan/00-installer-config.yaml'
+ #   - sed -i -e 's/^#\?PermitRootLogin.*/PermitRootLogin yes/g' /target/etc/ssh/sshd_config
+    - curtin in-target --target=/target -- chmod 440 /etc/sudoers.d/packeradmin
+ #   - curtin in-target --target=/target -- apt-get update
+ #   - curtin in-target --target=/target -- apt-get upgrade --yes
+    # - 'sed -i "$ a\HostKeyAlgorithms +ssh-rsa\nPubkeyAcceptedKeyTypes +ssh-rsa" /target/etc/ssh/sshd_config'
+    # - sudo systemctl start ssh

@@ -1,0 +1,1 @@
+Configuration files, unattented files, or other OS specific configuration resources.

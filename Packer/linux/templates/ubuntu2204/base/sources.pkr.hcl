@@ -86,7 +86,7 @@ source "vsphere-iso" "default" {
 #source "amazon-ebs" "default" {
 #  communicator    = "ssh"
 #  ssh_username    = "ubuntu"
-#  ami_description = "Ubuntu 20.04 LTS AMI. Built by Hashicorp Packer on ${local.buildtime}."
+#  ami_description = "Ubuntu 22.04 LTS AMI. Built by Hashicorp Packer on ${local.buildtime}."
 #  ami_name        = "${var.vm_name}"
 #  instance_type   = "${var.ami_instance_type}"
 #  region          = "${var.aws_region}"

@@ -1,9 +1,9 @@
 locals {
-  vsphere_password = vault("dso-packer-testing/data/base_credentials", "vsphere_password")
+  vsphere_password = vault("", "")
   scripts_path     = "../../../scripts"
 
-  aws_access_key = vault("dso-packer-testing/data/base_credentials", "aws_access_key")
-  aws_secret_key = vault("dso-packer-testing/data/base_credentials", "aws_secret_key")
+  aws_access_key = vault("", "")
+  aws_secret_key = vault("", "")
 }
 
 build {
